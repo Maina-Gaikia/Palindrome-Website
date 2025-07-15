@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palindrome Explorer</title>
+    <link rel="stylesheet" type="text/css" href="palindrome.css">
+    <audio id="successSound" src="sounds/cheering.mp3"></audio>
+    <audio id="errorSound" src="sounds/error.mp3"></audio>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Palindrome Explorer</h1>
+        <p class="subtitle">Discover the magic of words that read the same forwards and backwards!</p>
+        
+        <div class="input-section">
+            <label for="textInput">Enter text to check:</label>
+            <input type="text" id="textInput" placeholder="Type a word or phrase here..." autofocus>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-primary" onclick="checkPalindrome()">Check Palindrome</button>
+            <button class="btn-secondary" onclick="generatePalindrome()">Generate Random</button>
+            <button class="btn-secondary" onclick="clearAll()">Clear</button>
+        </div>
+        
+        <div id="result"></div>
+        
+        <div id="textAnalysis" class="text-analysis"></div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="checksCount">0</div>
+                <div class="stat-label">Checks</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="palindromesFound">0</div>
+                <div class="stat-label">Palindromes Found</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="successRate">0%</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="longestPalindrome">0</div>
+                <div class="stat-label">Longest Found</div>
+            </div>
+            <button class="btn-secondary" onclick="resetStats()">Reset Stats</button>
+        </div>
+        
+        <div class="examples">
+            <h3>✨ Try These Examples:</h3>
+            <div class="example-list">
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('racecar')">racecar ✓</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('A man a plan a canal Panama')">A man a plan a canal Panama ✓</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('hello')">hello ✗</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('madam')">madam ✓</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('world')">world ✗</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('Was it a car or a cat I saw')">Was it a car or a cat I saw ✓</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('level')">level ✓</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('programming')">programming ✗</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('Never odd or even')">Never odd or even ✓</div>
+                <div class="example-item" tabindex="0" role="button" onclick="tryExample('computer')">computer ✗</div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="confettiCanvas"></canvas>
+
+    <script>
+        let stats;
+        if (localStorage.getItem('palindromeStats')) {
+            stats = JSON.parse(localStorage.getItem('palindromeStats'));
+            updateStats();
+        } else {
+            stats = { checks: 0, palindromesFound: 0, longestPalindrome: 0 };
+        }
+
+        let triedExamples = new Set();
+
+        const palindromes = [
+            "racecar", "level", "madam", "radar", "civic", "rotor", "kayak", "deified",
+            "A man a plan a canal Panama", "Was it a car or a cat I saw", 
+            "Never odd or even", "Mr. Owl ate my metal worm", "Do geese see God",
+            "A Santa at NASA", "Taco cat", "Step on no pets", "Live not on evil"
+        ];
+
+        const messages = [
+            "Did you know? The longest palindromic word in English is 'tattarrattat' (12 letters), coined by James Joyce!",
+            "Fun fact: 'A man, a plan, a canal: Panama' is a famous palindrome inspired by the Panama Canal.",
+            "Keep it up! You’re a palindrome pro!",
+            "Palindrome means 'running back again' in Greek, from 'palin' (back) and 'dromos' (running).",
+            "Historical tidbit: Ancient Greeks used palindromes in magical texts for symmetry and power.",
+            "Wow! Palindromes like 'racecar' are the same in mirrors—try writing one!",
+            "Did you know? 'Madam' is one of the oldest known palindromes in English.",
+            "Fun challenge: Can you create a palindrome longer than your current record?",
+            "Palindromes are like word puzzles—symmetrical and satisfying!",
+            "Inspiration: The number 12321 is a numeric palindrome—numbers can be palindromes too!"
+        ];
+
+        // Confetti Setup
+        const confettiCanvas = document.getElementById('confettiCanvas');
+        const confettiCtx = confettiCanvas.getContext('2d');
+        let confettiParticles = [];
+
+        function resizeCanvas() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+
+        function createConfetti() {
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7'];
+            for (let i = 0; i < 100; i++) {
+                confettiParticles.push({
+                    x: Math.random() * confettiCanvas.width,
+                    y: -10,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: Math.random() * 4 + 2,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    size: Math.random() * 4 + 2,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: (Math.random() - 0.5) * 6
+                });
+            }
+        }
+
+        function animateConfetti() {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                const p = confettiParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.rotation += p.rotationSpeed;
+                confettiCtx.save();
+                confettiCtx.translate(p.x, p.y);
+                confettiCtx.rotate(p.rotation * Math.PI / 180);
+                confettiCtx.fillStyle = p.color;
+                confettiCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                confettiCtx.restore();
+                if (p.y > confettiCanvas.height) confettiParticles.splice(i, 1);
+            }
+            if (confettiParticles.length > 0) requestAnimationFrame(animateConfetti());
+        }
+
+        function triggerConfetti() {
+            createConfetti();
+            animateConfetti();
+        }
+
+        function cleanText(text) {
+            return text.toLowerCase().replace(/[^a-z0-9]/g, '');
+        }
+
+        function isPalindrome(text) {
+            const cleaned = cleanText(text);
+            return cleaned === cleaned.split('').reverse().join('');
+        }
+
+        function showTextAnalysis(text) {
+            const analysisDiv = document.getElementById('textAnalysis');
+            analysisDiv.innerHTML = '';
+            const steps = [
+                { label: 'Original', value: `"${text}"` },
+                { label: 'Cleaned', value: `"${cleanText(text)}"` },
+                { label: 'Reversed', value: `"${cleanText(text).split('').reverse().join('')}"` },
+                { label: 'Match', value: isPalindrome(text) ? '✓ Yes' : '✗ No', class: isPalindrome(text) ? 'match-yes' : 'match-no' }
+            ];
+            steps.forEach((step, index) => {
+                const row = document.createElement('div');
+                row.className = 'analysis-row';
+                row.innerHTML = `
+                    <div class="analysis-item">
+                        <span class="analysis-label">${step.label}:</span>
+                        <span class="analysis-value ${step.class || ''}">${step.value}</span>
+                    </div>
+                `;
+                analysisDiv.appendChild(row);
+                setTimeout(() => row.classList.add('show'), index * 300);
+            });
+            analysisDiv.style.display = 'block';
+            setTimeout(() => analysisDiv.classList.add('show'), 10); // Add show class for animation
+        }
+
+        function shakeElement(element) {
+            element.classList.add('shake');
+            setTimeout(() => element.classList.remove('shake'), 600);
+        }
+
+        function pulseStats() {
+            const statsDiv = document.querySelector('.stats');
+            statsDiv.classList.add('pulse');
+            setTimeout(() => statsDiv.classList.remove('pulse'), 400);
+        }
+
+        function checkPalindrome() {
+            const input = document.getElementById('textInput');
+            const text = input.value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            if (text === '') {
+                showResult('Please enter some text to check!', 'error');
+                shakeElement(input);
+                document.getElementById('errorSound').play().catch(() => showResult('Error: Could not play sound. Check audio files.', 'error'));
+                return;
+            }
+            if (text.length === 1) {
+                showResult('😏 Too easy! Try something longer.', 'info');
+                shakeElement(input);
+                document.getElementById('errorSound').play().catch(() => showResult('Error: Could not play sound. Check audio files.', 'error'));
+                return;
+            }
+            if (text.length === 2) {
+                showResult('🤔 Still too short! Aim for 3+ characters.', 'info');
+                shakeElement(input);
+                document.getElementById('errorSound').play().catch(() => showResult('Error: Could not play sound. Check audio files.', 'error'));
+                return;
+            }
+
+            stats.checks++;
+            pulseStats();
+            showTextAnalysis(text);
+
+            if (isPalindrome(text)) {
+                stats.palindromesFound++;
+                const cleanedLength = cleanText(text).length;
+                if (cleanedLength > stats.longestPalindrome) stats.longestPalindrome = cleanedLength;
+                showResult(`🎉 "${text}" is a palindrome!`, 'success');
+                triggerConfetti();
+                document.getElementById('successSound').play().catch(() => showResult('Error: Could not play sound. Check audio files.', 'error'));
+                const checkButton = document.querySelector('.btn-primary');
+                checkButton.classList.add('celebrate');
+                setTimeout(() => checkButton.classList.remove('celebrate'), 800);
+            } else {
+                showResult(`❌ "${text}" is not a palindrome.`, 'error');
+                shakeElement(resultDiv);
+                document.getElementById('errorSound').play().catch(() => showResult('Error: Could not play sound. Check audio files.', 'error'));
+            }
+            updateStats();
+        }
+
+        function generatePalindrome() {
+            const randomPalindrome = palindromes[Math.floor(Math.random() * palindromes.length)];
+            const input = document.getElementById('textInput');
+            input.value = randomPalindrome;
+            input.classList.add('highlight');
+            setTimeout(() => input.classList.remove('highlight'), 500);
+            showResult(`🎲 Generated: "${randomPalindrome}" - Check it out!`, 'info');
+        }
+
+        function clearAll() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('textAnalysis').style.display = 'none';
+            document.getElementById('textInput').focus();
+        }
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            resultDiv.innerHTML = `
+                <div class="result ${type}">${message}</div>
+                <div class="fun-fact">${randomMessage}</div>
+            `;
+        }
+
+        function tryExample(example) {
+            document.getElementById('textInput').value = example;
+            triedExamples.add(example);
+            const exampleElements = document.querySelectorAll('.example-item');
+            exampleElements.forEach(el => {
+                // Remove 'tried' from all, then add to those in the set
+                const text = el.textContent.replace(/ ✓| ✗/g, '').trim();
+                if (triedExamples.has(text)) {
+                    el.classList.add('tried');
+                } else {
+                    el.classList.remove('tried');
+                }
+                if (el.textContent.includes(example)) {
+                    el.classList.add('clicked');
+                    setTimeout(() => el.classList.remove('clicked'), 200);
+                }
+            });
+        }
+        let previousStats = null;
+
+        function updateStats() {
+            const elements = {
+                checks: document.getElementById('checksCount'),
+                palindromes: document.getElementById('palindromesFound'),
+                longest: document.getElementById('longestPalindrome'),
+                rate: document.getElementById('successRate')
+            };
+            elements.checks.textContent = stats.checks;
+            elements.palindromes.textContent = stats.palindromesFound;
+            elements.longest.textContent = stats.longestPalindrome;
+            const successRate = stats.checks > 0 ? Math.round((stats.palindromesFound / stats.checks) * 100) : 0;
+            elements.rate.textContent = successRate + '%';
+            Object.values(elements).forEach(el => {
+                el.classList.add('stat-update');
+                setTimeout(() => el.classList.remove('stat-update'), 300);
+            });
+            // Only update localStorage if stats have changed
+            const statsString = JSON.stringify(stats);
+            if (previousStats !== statsString) {
+                localStorage.setItem('palindromeStats', statsString);
+                previousStats = statsString;
+            }
+        }
+
+        function resetStats() {
+            stats = { checks: 0, palindromesFound: 0, longestPalindrome: 0 };
+            updateStats();
+            localStorage.removeItem('palindromeStats');
+        }
+
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            document.getElementById('textInput').focus();
+        });
+        window.addEventListener('resize', resizeCanvas);
+        document.getElementById('textInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') checkPalindrome();
+        });
+    </script>
+</body>
+</html>
